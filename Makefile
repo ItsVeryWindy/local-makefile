@@ -15,11 +15,21 @@ $(CACHE_DIR):
 	@mkdir $(CACHE_DIR)
 
 $(GIT_DIR): | $(CACHE_DIR)
-	@IS_SSH=$$(ssh -o StrictHostKeyChecking=no -T git@github.com > /dev/null 2>&1; [ $$? -eq 0 ] && echo "1"); \
-	GIT_PROTOCOL=$$(if [ "$$IS_SSH" = "1" ]; then echo "git@github.com:"; else echo "https://github.com/"; fi); \
-	GIT_CLONE_URL=$${GIT_PROTOCOL}$(GIT_REPO); \
-	mkdir $(GIT_DIR); \
-	git clone $${GIT_CLONE_URL} --no-checkout $(GIT_DIR)
+	@\
+	set -e; \
+	HTTPS_CLONE_URL="https://github.com/$(GIT_REPO)"; \
+	SSH_CLONE_URL="git@github.com:$(GIT_REPO)"; \
+	USE_HTTPS=$$(git ls-remote "$$HTTPS_CLONE_URL" > /dev/null 2>&1 && echo "1" || echo "0"); \
+	USE_SSH=$$([ "$$USE_HTTPS" != "1" ] && git ls-remote "$$SSH_CLONE_URL" > /dev/null 2>&1 && echo "1" || echo "0"); \
+	if [ "$$USE_HTTPS" != "1" ] && [ "$$USE_SSH" != "1" ]; then \
+		echo "Neither https or ssl can be used to clone the repo"; \
+		exit 1; \
+	fi; \
+	echo "Creating directory $(GIT_DIR)..."; \
+	mkdir "$(GIT_DIR)"; \
+	GIT_CLONE_URL=$$([ "$$USE_HTTPS" = "1" ] && echo "$$HTTPS_CLONE_URL" || echo "$$SSH_CLONE_URL"); \
+	echo "Cloning repository $$HTTPS_CLONE_URL..."; \
+	git clone "$$GIT_CLONE_URL" --no-checkout "$(GIT_DIR)"
 
 $(GIT_HASH_FILE): | $(GIT_DIR)
 	@cd $(GIT_DIR) && git rev-parse HEAD > $(CURRENT_DIR)/$(GIT_HASH_FILE)
