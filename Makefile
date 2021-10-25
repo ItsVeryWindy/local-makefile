@@ -1,7 +1,4 @@
-IS_SSH := $(shell ssh -o StrictHostKeyChecking=no -T git@github.com > /dev/null 2>&1; [ $$? -eq 0 ] && echo "1")
-GIT_PROTOCOL := $(if $(IS_SSH), git@github.com:, https://github.com/)
 GIT_REPO := ItsVeryWindy/remote-makefile.git
-GIT_CLONE_URL := $(GIT_PROTOCOL)$(GIT_REPO)
 CACHE_DIR := $(shell echo $${TMPDIR-/tmp}/dds)
 GIT_DIR := $(CACHE_DIR)/repo
 GIT_BRANCH := master
@@ -18,8 +15,11 @@ $(CACHE_DIR):
 	@mkdir $(CACHE_DIR)
 
 $(GIT_DIR): | $(CACHE_DIR)
-	@mkdir $(GIT_DIR)
-	@git clone $(GIT_CLONE_URL) --no-checkout $(GIT_DIR)
+	@IS_SSH=$$(ssh -o StrictHostKeyChecking=no -T git@github.com > /dev/null 2>&1; [ $$? -eq 0 ] && echo "1"); \
+	GIT_PROTOCOL=$$(if [ "$$IS_SSH" = "1" ]; then echo "git@github.com:"; else echo "https://github.com/"; fi); \
+	GIT_CLONE_URL=$${GIT_PROTOCOL}$(GIT_REPO); \
+	mkdir $(GIT_DIR); \
+	git clone $${GIT_CLONE_URL} --no-checkout $(GIT_DIR)
 
 $(GIT_HASH_FILE): | $(GIT_DIR)
 	@cd $(GIT_DIR) && git rev-parse HEAD > $(CURRENT_DIR)/$(GIT_HASH_FILE)
